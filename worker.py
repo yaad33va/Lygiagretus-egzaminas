@@ -1,12 +1,6 @@
 """
-worker.py - Python multiprocessing food processing system
-
-Performance measurements (with data1.json - 300 items all matching filters):
-- Single worker: ~12 seconds total
-- Maximum workers (CPU_cores - 1): ~3 seconds total
-- Optimal configuration: Use all available cores minus 1 for C++ processing
+Python worker
 """
-
 import socket
 import multiprocessing
 import time
@@ -15,17 +9,17 @@ import queue
 
 def complex_computation(quantity: int, price: float) -> float:
     """
-    Complex computation that takes at least 6 seconds for full dataset
-    with single worker. Computes iterative sum based on item properties.
+        Simulates a complex computation.
+     Args:
+        quantity: Quantity of the food
+        price: Cost of the food
     """
     result = float(quantity + price * 100)
 
-    # Perform many iterations to ensure processing takes sufficient time
     for i in range(1000000):
         result = (result * 1.103515245 + 12345.0) % (2**31)
         result = result / 1000000.0 + quantity + price
         result = abs(result)
-        # Add hash-like mixing
         temp = result * 2654435761.0
         result = (temp % 1000000) + quantity * (i % 10 + 1)
 
@@ -36,7 +30,7 @@ def worker_process(input_queue: multiprocessing.Queue,
                    output_queue: multiprocessing.Queue,
                    worker_id: int) -> None:
     """
-    Worker process that receives items, processes them, and sends results.
+    Receives items, processes them, and sends results.
 
     Args:
         input_queue: Queue to receive work items from
@@ -56,11 +50,7 @@ def worker_process(input_queue: multiprocessing.Queue,
                 break
 
             name, quantity, price = item
-
-            # Perform complex computation
-
             result = complex_computation(quantity, price)
-                # Send result
             if price >= 2.0:
                 output_queue.put((name, result))
                 items_processed += 1
@@ -119,14 +109,12 @@ def receiver_process(input_queue: multiprocessing.Queue) -> None:
                     continue
 
                 try:
-                    # Parse: name,quantity,price
                     parts = line.split(',')
                     if len(parts) >= 3:
                         name = parts[0]
                         quantity = int(parts[1])
                         price = float(parts[2])
 
-                        # Apply filters - only process if passes both
                         input_queue.put((name, quantity, price))
                         items_received += 1
                 except ValueError as e:
@@ -151,10 +139,8 @@ def sender_process(output_queue: multiprocessing.Queue, num_workers: int) -> Non
     """
     print("Sender process started")
 
-    # Wait a bit for C++ receiver to be ready
     time.sleep(1)
 
-    # Connect to C++ receiver
     sender_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     attempts = 0
@@ -209,18 +195,15 @@ def main():
     """Main function to coordinate all processes."""
     start_time = time.time()
 
-    # Determine number of workers
-    # Use all cores minus 1 (leave one for C++ processing)
     num_workers = max(1, multiprocessing.cpu_count() - 1)
+    # Vienas workeris
     # num_workers = 1
 
     print(f"Starting with {num_workers} worker processes")
 
-    # Create queues
     input_queue = multiprocessing.Queue()
     output_queue = multiprocessing.Queue()
 
-    # Create processes
     workers = []
     for i in range(num_workers):
         worker = multiprocessing.Process(
@@ -232,7 +215,7 @@ def main():
 
     receiver = multiprocessing.Process(
         target=receiver_process,
-        args=(input_queue, num_workers)
+        args=(input_queue,)
     )
     receiver.start()
 
@@ -242,21 +225,17 @@ def main():
     )
     sender.start()
 
-    # Wait for receiver to finish first
     receiver.join()
     print("Receiver joined")
 
-    # Now send STOP signals to all workers from main process
     print(f"Main process sending STOP signals to {num_workers} workers")
     for i in range(num_workers):
         input_queue.put("STOP")
         print(f"Main sent STOP to worker {i}")
 
-    # Wait for sender to finish
     sender.join()
     print("Sender joined")
 
-    # Wait for all workers
     for i, worker in enumerate(workers):
         worker.join(timeout=5)
         if worker.is_alive():
@@ -269,6 +248,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # Set start method for compatibility
     multiprocessing.set_start_method('spawn', force=True)
     main()

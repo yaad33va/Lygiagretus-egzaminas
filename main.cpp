@@ -1,9 +1,63 @@
 /*
-Vienas workeris - data1.json
+Vienas workeris
+------------------------------------------------------
+data1.json
 Python program completed in 136.47 seconds
 OpenCL thread completed in 2054014 ms
 
+Python program completed in 138.19 seconds
+OpenCL thread completed in 2166473 ms
+------------------------------------------------------
+data2.json
+OpenCL thread completed in 2151014 ms
+Python program completed in 130.16 seconds
 
+Python program completed in 116.45 seconds
+OpenCL thread completed in 2117419 ms
+------------------------------------------------------
+data3.json
+Python program completed in 129.00 seconds
+OpenCL thread completed in 2172529 ms
+
+Python program completed in 120.70 seconds
+OpenCL thread completed in 2138576 ms
+------------------------------------------------------
+data4.json
+Python program completed in 146.61 seconds
+OpenCL thread completed in 2209920 ms
+
+Python program completed in 124.29 seconds
+OpenCL thread completed in 2134567 ms
+------------------------------------------------------
+
+Maksimaliai apkrauta įranga:
+data1.json
+Python program completed in 13.58 seconds
+OpenCL thread completed in 7976 ms
+
+OpenCL thread completed in 8291 ms
+Python program completed in 13.70 seconds
+------------------------------------------------------
+data2.json
+Python program completed in 12.90 seconds
+OpenCL thread completed in 7860 ms
+
+Python program completed in 12.74 seconds
+OpenCL thread completed in 7902 ms
+------------------------------------------------------
+data3.json
+Python program completed in 14.84 seconds
+OpenCL thread completed in 7987 ms
+
+Python program completed in 13.26 seconds
+OpenCL thread completed in 8476 ms
+------------------------------------------------------
+data4.json
+Python program completed in 13.76 seconds
+OpenCL thread completed in 7924 ms
+
+Python program completed in 12.46 seconds
+OpenCL thread completed in 7773 ms
  */
 #include <iostream>
 #include <fstream>
@@ -66,7 +120,6 @@ std::vector<FoodItem> parseJSON(const std::string& filename) {
     return items;
 }
 
-// OpenCL thread function
 void openclThread(const std::vector<FoodItem>& items,
     std::vector<FoodItem>& filtered_items,
     const std::string& kernel_source) {
@@ -82,7 +135,6 @@ void openclThread(const std::vector<FoodItem>& items,
         return;
     }
 
-    // Get device (prefer GPU, fallback to CPU)
     err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, nullptr);
     if (err != CL_SUCCESS) {
         err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, 1, &device, nullptr);
@@ -92,7 +144,6 @@ void openclThread(const std::vector<FoodItem>& items,
         }
     }
 
-    // Print device info
     char device_name[128];
     char platform_name[128];
     clGetDeviceInfo(device,
@@ -108,7 +159,6 @@ void openclThread(const std::vector<FoodItem>& items,
     std::cout << "OpenCL Platform: " << platform_name << std::endl;
     std::cout << "OpenCL Device: " << device_name << std::endl;
 
-    // Create context
     cl_context context = clCreateContext(nullptr,
         1,
         &device,
@@ -120,7 +170,6 @@ void openclThread(const std::vector<FoodItem>& items,
         return;
     }
 
-    // Create command queue
     cl_command_queue queue = clCreateCommandQueueWithProperties(context,
         device,
         nullptr,
@@ -132,7 +181,6 @@ void openclThread(const std::vector<FoodItem>& items,
     }
     const char* source_str = kernel_source.c_str();
 
-    // Create program
     cl_program program = clCreateProgramWithSource(context,
         1,
         &source_str,
@@ -145,7 +193,6 @@ void openclThread(const std::vector<FoodItem>& items,
         return;
     }
 
-    // Build program
     err = clBuildProgram(program, 1, &device, nullptr, nullptr, nullptr);
     if (err != CL_SUCCESS) {
         std::cerr << "Failed to build program" << std::endl;
@@ -163,7 +210,7 @@ void openclThread(const std::vector<FoodItem>& items,
         return;
     }
 
-    // Create kernel
+    // Sukuriam kerneli
     // vienas workeris
     // cl_kernel kernel = clCreateKernel(program, "process_items_single", &err);
 
@@ -177,7 +224,6 @@ void openclThread(const std::vector<FoodItem>& items,
         return;
     }
 
-    // Prepare data
     std::vector<cl_int> quantities;
     std::vector<float> prices;
     std::vector<int> indexes(items.size(), -1);
@@ -190,7 +236,7 @@ void openclThread(const std::vector<FoodItem>& items,
 
     std::vector<unsigned int> results(items.size(), 0);
 
-    // Create buffers
+    // Buferiai
     cl_mem qty_buffer = clCreateBuffer(context,
         CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
         sizeof(cl_int) * quantities.size(),
@@ -212,7 +258,6 @@ void openclThread(const std::vector<FoodItem>& items,
         output_count.data(),
         &err);
 
-    // Set kernel arguments
     int count = static_cast<int>(items.size());
     clSetKernelArg(kernel, 0, sizeof(cl_mem), &qty_buffer);
     clSetKernelArg(kernel, 1, sizeof(cl_mem), &result_buffer);
@@ -220,7 +265,6 @@ void openclThread(const std::vector<FoodItem>& items,
     clSetKernelArg(kernel, 3, sizeof(cl_mem), &output_count_buffer);
     clSetKernelArg(kernel, 4, sizeof(cl_int), &count);
 
-    // Execute kernel
     size_t global_size = items.size();
     // size_t global_size = 1;
     // vienas workeris
@@ -239,7 +283,6 @@ void openclThread(const std::vector<FoodItem>& items,
 
     clFinish(queue);
 
-    // Read results
     clEnqueueReadBuffer(queue,
         result_buffer,
         CL_TRUE,
@@ -274,7 +317,6 @@ void openclThread(const std::vector<FoodItem>& items,
     for (auto& rez : results) {
         std::cout << "result: " << rez << std::endl;
     }
-    // Store results
     for (int i = 0; i < output_count[0]; i++) {
         int org_index = indexes[i];
         if (org_index >= 0 && org_index < static_cast<int>(items.size())) {
@@ -284,7 +326,6 @@ void openclThread(const std::vector<FoodItem>& items,
         }
     }
 
-    // Cleanup
     clReleaseMemObject(qty_buffer);
     clReleaseMemObject(result_buffer);
     clReleaseMemObject(index_buffer);
@@ -301,7 +342,6 @@ void openclThread(const std::vector<FoodItem>& items,
     << std::endl;
 }
 
-// Python sender thread
 void pythonSender(const std::vector<FoodItem>& items) {
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -317,7 +357,6 @@ void pythonSender(const std::vector<FoodItem>& items) {
     server_addr.sin_port = htons(5001);
     inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr);
 
-    // Retry connection
     int attempts = 0;
     while (connect(sock,
         reinterpret_cast<sockaddr *>(&server_addr),
@@ -338,14 +377,12 @@ void pythonSender(const std::vector<FoodItem>& items) {
 
     std::cout << "Connected to Python receiver" << std::endl;
 
-    // Send filtered items
     for (const auto& item : items) {
         std::string message = item.name + "," + std::to_string(item.quantity) +
                              "," + std::to_string(item.price) + "\n";
         send(sock, message.c_str(), static_cast<int>(message.length()), 0);
     }
 
-    // Send end signal
     std::string end_msg = "END\n";
     send(sock, end_msg.c_str(), static_cast<int>(end_msg.length()), 0);
 
@@ -363,7 +400,6 @@ void pythonSender(const std::vector<FoodItem>& items) {
     << std::endl;
 }
 
-// Python receiver thread
 void pythonReceiver(std::vector<FoodItem>& items) {
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -409,7 +445,6 @@ void pythonReceiver(std::vector<FoodItem>& items) {
 
     std::cout << "Python sender connected" << std::endl;
 
-    // Receive results
     char buffer[4096];
     std::string accumulated;
 
@@ -429,7 +464,6 @@ void pythonReceiver(std::vector<FoodItem>& items) {
                 goto finish_receive;
             }
 
-            // Parse: name,result
             size_t comma = line.find(',');
             if (comma != std::string::npos) {
                 std::string name = line.substr(0, comma);
@@ -483,14 +517,12 @@ int main(int argc, char* argv[]) {
     std::string input_file = argv[1];
     std::cout << "Processing file: " << input_file << std::endl;
 
-    // Parse input
     std::vector<FoodItem> items = parseJSON(input_file);
     std::cout << "Loaded " << items.size() << " items" << std::endl;
 
     std::vector<FoodItem> openclFiltered;
     std::vector<FoodItem> pythonFiltered;
 
-    // Start threads
     std::thread opencl_t(openclThread,
         std::ref(items),
         std::ref(openclFiltered),
@@ -498,13 +530,11 @@ int main(int argc, char* argv[]) {
     std::thread sender_t(pythonSender, std::ref(items));
     std::thread receiver_t(pythonReceiver, std::ref(pythonFiltered));
 
-    // Wait for completion
     opencl_t.join();
     sender_t.join();
     receiver_t.join();
 
     std::vector<FoodItem> filtered_items;
-    // Merge results
     for (auto& cl_item : openclFiltered) {
         for (auto& python_item : pythonFiltered) {
             if (cl_item.name == python_item.name) {
@@ -515,7 +545,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Write results
     std::string output_file = "results.txt";
     std::ofstream out(output_file);
 
